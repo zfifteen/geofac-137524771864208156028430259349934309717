@@ -7,6 +7,11 @@ Uses base seed 42 with per-gate derivation for reproducibility.
 
 Unbalanced semiprimes are harder than balanced ones because
 the small factor p is far below √N, not clustered near it.
+
+Prime Generation:
+    Uses Z5D prime generator when available (Apple Silicon with MPFR/GMP).
+    Falls back to Miller-Rabin probabilistic primality testing otherwise.
+    See: https://github.com/zfifteen/z5d-prime-predictor
 """
 
 import random
@@ -17,6 +22,9 @@ from typing import Optional, List, Dict, Any
 from pathlib import Path
 from math import isqrt
 
+# Import Z5D prime generator wrapper
+from .z5d_prime import next_prime as z5d_next_prime, is_prime as z5d_is_prime
+
 # Canonical constants
 BASE_SEED = 42
 RATIO = 0.25  # small factor gets 25% of bits → 1:3 ratio
@@ -26,80 +34,22 @@ CHALLENGE_BITS = 127
 
 def _simple_next_prime(n: int) -> int:
     """
-    Find the next prime >= n using Miller-Rabin for large numbers.
-    Falls back to trial division for small numbers.
-    Avoids sympy dependency for standalone operation.
+    Find the next prime >= n using Z5D prime generator.
+    
+    Uses Z5D prime predictor when available (Apple Silicon with MPFR/GMP),
+    otherwise falls back to Miller-Rabin probabilistic testing.
+    
+    This maintains determinism while leveraging Z5D's optimized
+    prime-density predictions for large primes.
     """
-    if n < 2:
-        return 2
-    if n == 2:
-        return 2
-    if n % 2 == 0:
-        n += 1
-    while True:
-        if _is_prime(n):
-            return n
-        n += 2
+    return z5d_next_prime(n, use_z5d=True)
 
 
 def _is_prime(n: int) -> bool:
     """
-    Probabilistic primality test using Miller-Rabin for large numbers.
-    Uses trial division for small numbers.
+    Probabilistic primality test using Z5D or Miller-Rabin fallback.
     """
-    if n < 2:
-        return False
-    if n == 2 or n == 3:
-        return True
-    if n % 2 == 0:
-        return False
-    
-    # For small numbers, use trial division
-    if n < 1000:
-        i = 3
-        while i * i <= n:
-            if n % i == 0:
-                return False
-            i += 2
-        return True
-    
-    # For large numbers, use Miller-Rabin
-    return _miller_rabin(n, k=10)
-
-
-def _miller_rabin(n: int, k: int = 10) -> bool:
-    """
-    Miller-Rabin probabilistic primality test.
-    
-    Args:
-        n: Number to test
-        k: Number of rounds (higher = more accurate, default 10 gives error < 2^-20)
-    
-    Returns:
-        True if n is probably prime, False if definitely composite
-    """
-    # Write n-1 as 2^r * d
-    r, d = 0, n - 1
-    while d % 2 == 0:
-        r += 1
-        d //= 2
-    
-    # Witness loop
-    for _ in range(k):
-        a = random.randint(2, n - 2)
-        x = pow(a, d, n)
-        
-        if x == 1 or x == n - 1:
-            continue
-        
-        for _ in range(r - 1):
-            x = pow(x, 2, n)
-            if x == n - 1:
-                break
-        else:
-            return False
-    
-    return True
+    return z5d_is_prime(n, use_z5d=True)
 
 
 @dataclass

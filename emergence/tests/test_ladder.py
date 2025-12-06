@@ -13,6 +13,7 @@ from cellview.utils.ladder import (
     _is_prime,
     _simple_next_prime,
 )
+from cellview.utils import z5d_prime
 
 
 class TestPrimalityFunctions(unittest.TestCase):
@@ -43,6 +44,13 @@ class TestPrimalityFunctions(unittest.TestCase):
         self.assertEqual(_simple_next_prime(4), 5)
         self.assertEqual(_simple_next_prime(10), 11)
         self.assertEqual(_simple_next_prime(14), 17)
+    
+    def test_z5d_fallback_works(self):
+        """Test that Z5D wrapper falls back correctly when Z5D unavailable."""
+        # This should work even without Z5D installed
+        self.assertEqual(z5d_prime.next_prime(10), 11)
+        self.assertTrue(z5d_prime.is_prime(17))
+        self.assertFalse(z5d_prime.is_prime(18))
 
 
 class TestSeedDerivation(unittest.TestCase):
